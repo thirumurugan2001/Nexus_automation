@@ -5,43 +5,35 @@ import os
 def Request_PO_Amendment(data):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False, slow_mo=100)
-        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+        context = browser.new_context() 
         page = context.new_page()
         page.set_default_timeout(60000)        
         email = os.getenv("ERP_EMAIL", "bharathielectricalanna@gmail.com")
         password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026")
         try:
-            print("Navigating to login page...")
             page.goto("https://induserp.industowers.com/OA_HTML/AppsLocalLogin.jsp")
             page.wait_for_timeout(5000)            
-            print("Filling login credentials...")
             page.fill('input[name="usernameField"]', email)
             page.fill('input[name="passwordField"]', password)
             page.press('input[name="passwordField"]', 'Enter')            
-            print("Waiting for login to complete...")
             page.wait_for_timeout(8000)            
             try:
                 page.wait_for_selector("img[title='Expand']", timeout=15000)
-                print("Login successful, clicking Expand...")
                 page.click("img[title='Expand']")
             except PlaywrightTimeoutError:
                 print("Warning: Expand button not found, continuing anyway...")            
-            print("Navigating to Home Page...")
             try:
                 page.wait_for_selector("li >> text=Home Page", timeout=15000)
                 page.click("li >> text=Home Page")
                 page.wait_for_timeout(3000)
             except PlaywrightTimeoutError:
                 print("Warning: Home Page menu not found, trying alternative navigation...")            
-            print("Navigating to Orders...")
             try:
                 page.wait_for_selector("a:has-text('Orders')", timeout=15000)
                 page.click("a:has-text('Orders')")
                 page.wait_for_timeout(3000)
             except PlaywrightTimeoutError:
-                print("Error: Orders menu not found")
                 raise            
-            print("Clicking Purchase Orders...")
             try:
                 page.wait_for_selector("a[title='Purchase Orders']", timeout=15000)
                 page.click("a[title='Purchase Orders']")
@@ -49,7 +41,6 @@ def Request_PO_Amendment(data):
             except PlaywrightTimeoutError:
                 print("Error: Purchase Orders link not found")
                 raise            
-            print("Clicking Advanced Search...")
             try:
                 page.wait_for_selector("button:has-text('Advanced Search')", timeout=15000)
                 page.click("button:has-text('Advanced Search')")
@@ -57,7 +48,6 @@ def Request_PO_Amendment(data):
             except PlaywrightTimeoutError:
                 print("Error: Advanced Search button not found")
                 raise            
-            print(f"Searching for PO Number: {data['PO_Number']}")
             try:
                 page.wait_for_selector("input#Value_0", timeout=15000)
                 page.fill("input#Value_0", data["PO_Number"])
@@ -65,7 +55,6 @@ def Request_PO_Amendment(data):
             except PlaywrightTimeoutError:
                 print("Error: Search input field not found")
                 raise            
-            print("Clicking Submit button...")
             try:
                 page.wait_for_selector("button#customizeSubmitButton", timeout=15000)
                 page.click("button#customizeSubmitButton")
@@ -73,23 +62,19 @@ def Request_PO_Amendment(data):
             except PlaywrightTimeoutError:
                 print("Error: Submit button not found")
                 raise            
-            print("Looking for PO number link...")
             po_selectors = [f"a:has-text('{data['PO_Number']}')","a[id^='N93:PosPoNumber:']",f"a:contains('{data['PO_Number']}')","table a",]
             po_link_found = False
             for selector in po_selectors:
                 try:
                     page.wait_for_selector(selector, timeout=10000)
                     page.click(selector)
-                    print(f"Clicked PO link using selector: {selector}")
                     po_link_found = True
                     break
                 except PlaywrightTimeoutError:
                     continue            
             if not po_link_found:
                 page.screenshot(path="debug_search_results.png")
-                print("Screenshot saved as debug_search_results.png")
                 raise Exception(f"PO Number link for {data['PO_Number']} not found")            
-            print("Clicking Request PO Amendment...")
             page.wait_for_timeout(3000)            
             amendment_selectors = ["button:text('Request PO Amendment')","button:has-text('Request PO Amendment')","input[value='Request PO Amendment']",]            
             amendment_found = False
@@ -97,35 +82,26 @@ def Request_PO_Amendment(data):
                 try:
                     page.wait_for_selector(selector, timeout=10000)
                     page.click(selector)
-                    print(f"Clicked Request PO Amendment using selector: {selector}")
                     amendment_found = True
                     break
                 except PlaywrightTimeoutError:
                     continue            
             if not amendment_found:
                 raise Exception("Request PO Amendment button not found")            
-            print("Waiting for PO Amendment form to load...")
             page.wait_for_timeout(10000)                        
             try:
                 page.wait_for_selector("table[id='POLinesAddRN:Content']", timeout=15000)
-                print("PO Amendment form loaded successfully")
             except PlaywrightTimeoutError:
-                print("Warning: Table not found with specific ID, trying alternative...")
                 tables = page.locator("table").all()
-                print(f"Found {len(tables)} tables on the page")
                 if len(tables) > 0:
                     page.screenshot(path="debug_amendment_form.png")
-                    print("Screenshot saved as debug_amendment_form.png")            
             change_items = data.get("Change_Item", [])
             for change_item in change_items:
                 item_code = change_item["Item_Code"]
                 new_quantity = change_item["New_Quantity"]                
-                print(f"Looking for Item Code: {item_code}")                
                 try:
                     table_rows = page.locator("table[id='POLinesAddRN:Content'] tr").all()
-                    print(f"Found {len(table_rows)} table rows")
                 except:
-                    print("Could not find table rows, trying alternative selector...")
                     table_rows = page.locator("tr.xn0").all()                
                 for row_idx, row in enumerate(table_rows):
                     if row_idx == 0:
@@ -134,19 +110,15 @@ def Request_PO_Amendment(data):
                         item_cell = row.locator("td[headers='ItemCol']")
                         if item_cell.count() > 0:
                             item_text = item_cell.inner_text()
-                            print(f"Row {row_idx}: Found item text: {item_text}")                            
                             if item_code in item_text:
-                                print(f"Match found for {item_code} at row {row_idx}")                                
                                 action_select = row.locator("select")
                                 if action_select.count() > 0:
                                     try:
                                         action_select.select_option(label="Quantity Change")
-                                        print("Action changed to Quantity Change")
                                         page.wait_for_timeout(1000)
                                     except:
                                         try:
                                             action_select.select_option(value="Quantity Change")
-                                            print("Action changed to Quantity Change (by value)")
                                             page.wait_for_timeout(1000)
                                         except:
                                             print("Could not change Action dropdown")                                
@@ -158,11 +130,9 @@ def Request_PO_Amendment(data):
                                     if new_qty_input.count() > 0:
                                         new_qty_input.fill(new_quantity)
                                         new_qty_input.press("Tab")
-                                        print(f"Updated New Quantity to {new_quantity}")
                                         page.wait_for_timeout(500)
                                     else:
                                         new_qty_cell.type(new_quantity)
-                                        print(f"Typed New Quantity: {new_quantity}")
                                         page.wait_for_timeout(500)
                                 reason_cell = row.locator("td[headers='ReasonCol']")
                                 if reason_cell.count() > 0:
@@ -172,29 +142,206 @@ def Request_PO_Amendment(data):
                                     if reason_input.count() > 0:
                                         reason_input.fill("As per BOQ")
                                         reason_input.press("Tab")
-                                        print("Updated Reason to 'As per BOQ'")
                                         page.wait_for_timeout(500)
                                     else:
                                         reason_cell.type("As per BOQ")
-                                        print("Typed Reason: As per BOQ")
                                         page.wait_for_timeout(500)                                
                                 break
                     except Exception as e:
-                        print(f"Error processing row {row_idx}: {e}")
                         continue
-            page.wait_for_timeout(3000)            
+            added_items = data.get("Added_Items", [])            
+            for added_item in added_items:
+                try:
+                    add_line_selectors = ["img#addTableRow1","a[title='Add Line']","img[title='Add Line']","img[alt='Add Line']"]
+                    add_line_clicked = False
+                    for selector in add_line_selectors:
+                        try:
+                            page.wait_for_selector(selector, timeout=5000)
+                            page.click(selector)
+                            add_line_clicked = True
+                            page.wait_for_timeout(3000)
+                            break
+                        except PlaywrightTimeoutError:
+                            continue                    
+                    if not add_line_clicked:
+                        continue                    
+                    page.wait_for_timeout(2000)                  
+                    try:
+                        all_rows = page.locator("table[id='POLinesAddRN:Content'] tr").all()
+                        new_row_index = None                        
+                        for idx, row in enumerate(all_rows):
+                            if idx == 0:
+                                continue                             
+                            po_line_span = row.locator("span[id^='POLinesAddRN:POLineNumSt:']")
+                            if po_line_span.count() > 0:
+                                po_line_text = po_line_span.inner_text().strip()
+                                if po_line_text == "" or po_line_text == "<br>":
+                                    new_row_index = idx
+                                    new_row = row
+                                    break                        
+                        if new_row_index is None:
+                            new_row = all_rows[1] if len(all_rows) > 1 else None
+                    except Exception as e:
+                        all_rows = page.locator("table[id='POLinesAddRN:Content'] tr").all()
+                        new_row = all_rows[1] if len(all_rows) > 1 else None                    
+                    if not new_row:
+                        continue
+                    item_code_input = new_row.locator("input[id^='POLinesAddRN:ItemType:']")
+                    if item_code_input.count() > 0:
+                        item_code_input.fill(added_item['Item_Code'])
+                        item_code_input.press("Tab")
+                        page.wait_for_timeout(2000)
+                    else:
+                        item_code_input2 = new_row.locator("td[headers='ItemCol'] input")
+                        if item_code_input2.count() > 0:
+                            item_code_input2.fill(added_item['Item_Code'])
+                            item_code_input2.press("Tab")
+                            page.wait_for_timeout(2000)
+                    qty_input = new_row.locator("input[id^='POLinesAddRN:Qty:']")
+                    if qty_input.count() > 0:
+                        qty_input.fill(added_item['Quantity'])
+                        qty_input.press("Tab")
+                        page.wait_for_timeout(1000)
+                    else:
+                        print("Warning: Quantity input not found")
+                        qty_input2 = new_row.locator("td[headers='QtyCol'] input")
+                        if qty_input2.count() > 0:
+                            qty_input2.fill(added_item['Quantity'])
+                            qty_input2.press("Tab")
+                            print(f"Filled Quantity (alt): {added_item['Quantity']}")
+                            page.wait_for_timeout(1000)                    
+                    project_input = new_row.locator("input[id^='POLinesAddRN:ProjectNumberLov:']")
+                    if project_input.count() > 0:
+                        project_input.fill(added_item['Project_Number'])
+                        project_input.press("Tab")
+                        page.wait_for_timeout(1000)
+                    else:
+                        project_input2 = new_row.locator("td[headers='ProjectNumberCol'] input")
+                        if project_input2.count() > 0:
+                            project_input2.fill(added_item['Project_Number'])
+                            project_input2.press("Tab")
+                            page.wait_for_timeout(1000)                    
+                    reason_input = new_row.locator("input[id^='POLinesAddRN:Reason:']")
+                    if reason_input.count() > 0:
+                        reason_input.fill("As per BOQ")
+                        reason_input.press("Tab")
+                        page.wait_for_timeout(1000)
+                    else:
+                        reason_input2 = new_row.locator("td[headers='ReasonCol'] input")
+                        if reason_input2.count() > 0:
+                            reason_input2.fill("As per BOQ")
+                            reason_input2.press("Tab")
+                            print("Filled Reason (alt): As per BOQ")
+                            page.wait_for_timeout(1000)
+                    
+                    action_select = new_row.locator("select[id^='POLinesAddRN:ManualLine:']")
+                    if action_select.count() > 0:
+                        try:
+                            current_value = action_select.input_value()
+                            if "Add Line" not in current_value:
+                                try:
+                                    action_select.select_option(label="Add Line")
+                                except:
+                                    try:
+                                        action_select.select_option(value="Add Line")
+                                    except:
+                                        print("Could not set Action dropdown")
+                            else:
+                                print("Action already set to 'Add Line'")
+                            page.wait_for_timeout(1000)
+                        except Exception as e:
+                            print(f"Error setting Action: {e}")
+                    else:
+                        print("Warning: Action dropdown not found in new row")                    
+                    page.wait_for_timeout(2000)                     
+                except Exception as e:
+                    print(f"Error adding item {added_item.get('Item_Code', 'Unknown')}: {e}")                
+            page.wait_for_timeout(2000)            
+            attachment_selectors = ["img[title='Add Attachment']","img[alt='Add Attachment']","img[src*='add_attach']","a:has(img[title='Add Attachment'])","a:has(img[alt='Add Attachment'])"]
+            for selector in attachment_selectors:
+                try:
+                    page.wait_for_selector(selector, timeout=5000)
+                    page.click(selector)
+                    print(f"Clicked Add Attachment using selector: {selector}")
+                    break
+                except PlaywrightTimeoutError:
+                    continue
+            page.wait_for_timeout(2000)            
+            try:
+                category_selectors = ["select#AkAttachmentCategory","select[title='Category Name']","select.x8","select[name='AkAttachmentCategory']"]
+                category_found = False
+                for selector in category_selectors:
+                    try:
+                        page.wait_for_selector(selector, timeout=5000)
+                        page.select_option(selector, label="Miscellaneous")
+                        print("Selected 'Miscellaneous' from category dropdown")
+                        category_found = True
+                        break
+                    except Exception as e:
+                        continue                
+                if not category_found:
+                    try:
+                        page.select_option("select#AkAttachmentCategory", value="1WDSKCY-Z")
+                        print("Selected 'Miscellaneous' using value attribute")
+                    except:
+                        print("Warning: Could not select category from dropdown")          
+            except Exception as e:
+                print(f"Error handling category dropdown: {e}")
+           # Click the URL radio button
+            try:
+                page.wait_for_selector("input#AkAttachR2", timeout=5000)
+                page.click("input#AkAttachR2")
+                print("Clicked URL radio button")
+                page.wait_for_timeout(2000)
+                
+                # After clicking URL radio button, fill the URL input
+                try:
+                    # Wait for URL input field to be visible/enabled
+                    page.wait_for_selector("input#URLInput", timeout=5000)
+                    url_input = page.locator("input#URLInput")
+                    
+                    # Clear the field first (if needed)
+                    url_input.click()
+                    url_input.clear()
+                    
+                    # Fill the URL
+                    url_input.fill(data["File_Url"])
+                    print(f"Filled URL: {data['File_Url']}")
+                    
+                    # Press Tab to trigger any onchange events
+                    url_input.press("Tab")
+                    page.wait_for_timeout(1000)
+                    
+                except Exception as e:
+                    print(f"Error filling URL input: {e}")
+                    # Try alternative selector
+                    try:
+                        page.fill("input[name='URLInput']", data["File_Url"])
+                        print(f"Filled URL using name selector: {data['File_Url']}")
+                        page.wait_for_timeout(1000)
+                    except Exception as e2:
+                        print(f"Could not fill URL input: {e2}")
+                        page.screenshot(path="debug_url_input.png")
+                        
+            except Exception as e:
+                print(f"Error clicking URL radio button: {e}")
+                # Try alternative selectors
+                try:
+                    page.click("input[value='URL'][name='AkAttachRB']")
+                    print("Clicked URL radio button using alternative selector")
+                    page.wait_for_timeout(2000)
+                    
+                    # Fill URL after clicking radio button
+                    page.fill("input#URLInput", data["File_Url"])
+                    print(f"Filled URL after alt radio click: {data['File_Url']}")
+                    
+                except Exception as e2:
+                    print(f"Could not click URL radio button: {e2}")
+
             browser.close()
             print("Browser closed successfully")            
         except Exception as e:
-            print(f"Error during process: {e}")
-            try:
-                page.screenshot(path="error_screenshot.png")
-                print("Error screenshot saved as error_screenshot.png")
-            except:
-                pass
-            time.sleep(20)
-            browser.close()
-            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
+           raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
     data = {
@@ -212,7 +359,11 @@ if __name__ == "__main__":
                 "New_Quantity": "10"
             },
         ],
-        "Added_Items": []
+        "Added_Items": [{
+                "Item_Code": "29-400000-0-00-ZZ-ZZ-886",
+                "Quantity": "5",
+                "Project_Number": "R/RL-8139267"
+            }]
     }    
     try:
         result = Request_PO_Amendment(data)
