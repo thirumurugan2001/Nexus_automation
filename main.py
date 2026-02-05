@@ -3,30 +3,40 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 import os
 
 def Request_PO_Amendment(data):
-    with sync_playwright() as p:
+    with sync_playwright() as p:       
+        try:            
+            # INITIALIZE BROWSER
+            try :
+                browser = p.chromium.launch(headless=False, slow_mo=100)
+                context = browser.new_context() 
+                page = context.new_page()
+                page.set_default_timeout(60000)                
+                email = os.getenv("ERP_EMAIL", "bharathielectricalanna@gmail.com")
+                password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026") 
+            except PlaywrightTimeoutError as e:
+                print("INITIALIZE BROWSER")
+                raise Exception(f"Failed to initialize browser: {str(e)}")
 
-        # INITIALIZE BROWSER 
-        browser = p.chromium.launch(headless=False, slow_mo=100)
-        context = browser.new_context() 
-        page = context.new_page()
-        page.set_default_timeout(60000)                
-        email = os.getenv("ERP_EMAIL", "bharathielectricalanna@gmail.com")
-        password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026")        
-        try:
             # LOGIN TO ERP SYSTEM
-            page.goto("https://induserp.industowers.com/OA_HTML/AppsLocalLogin.jsp")
-            page.wait_for_timeout(5000)            
-            page.fill('input[name="usernameField"]', email)
-            page.fill('input[name="passwordField"]', password)
-            page.press('input[name="passwordField"]', 'Enter')            
-            page.wait_for_timeout(8000)
+            try : 
+                page.goto("https://induserp.industowers.com/OA_HTML/AppsLocalLogin.jsp")
+                page.wait_for_timeout(5000)            
+                page.fill('input[name="usernameField"]', email)
+                page.fill('input[name="passwordField"]', password)
+                page.press('input[name="passwordField"]', 'Enter')            
+                page.wait_for_timeout(8000)
+            except PlaywrightTimeoutError:
+                print("LOGIN TO ERP SYSTEM")
+                raise Exception("Failed to login - check credentials or page structure")
+            page.wait_for_timeout(2000)
 
             # EXPAND NAVIGATION MENU AND GO TO HOME PAGE
             try:
                 page.wait_for_selector("img[title='Expand']", timeout=15000)
                 page.click("img[title='Expand']")
             except PlaywrightTimeoutError:
-                print("Warning: Expand button not found, continuing anyway...")
+                print("EXPAND NAVIGATION MENU AND GO TO HOME PAGE")
+                raise Exception("Failed to expand navigation menu - structure may have changed")
             page.wait_for_timeout(2000) 
 
             # HOME PAGE LINK IN NAVIGATION MENU   
@@ -35,7 +45,8 @@ def Request_PO_Amendment(data):
                 page.click("li >> text=Home Page")
                 page.wait_for_timeout(3000)
             except PlaywrightTimeoutError:
-                print("Warning: Home Page menu not found, trying alternative navigation...")
+                print("HOME PAGE LINK IN NAVIGATION MENU")
+                raise Exception("Failed to click Home Page link - structure may have changed")
             page.wait_for_timeout(2000)
 
             # CLCICK ON ORDERS LINK IN NAVIGATION MENU
@@ -44,7 +55,8 @@ def Request_PO_Amendment(data):
                 page.click("a:has-text('Orders')")
                 page.wait_for_timeout(3000)
             except PlaywrightTimeoutError:
-                raise  
+                print("ORDERS LINK IN NAVIGATION MENU")
+                raise Exception("Failed to click Orders link - structure may have changed")
             page.wait_for_timeout(2000)          
             
             # PURCHASE ORDERS LINK IN ORDERS SUBMENU
@@ -53,8 +65,8 @@ def Request_PO_Amendment(data):
                 page.click("a[title='Purchase Orders']")
                 page.wait_for_timeout(5000)
             except PlaywrightTimeoutError:
-                print("Error: Purchase Orders link not found")
-                raise    
+                print("PURCHASE ORDERS LINK IN ORDERS SUBMENU")
+                raise Exception("Failed to click Purchase Orders link - structure may have changed") 
             page.wait_for_timeout(2000)
 
             # ADVANCED SEARCH BUTTON ON PURCHASE ORDERS PAGE
@@ -63,8 +75,8 @@ def Request_PO_Amendment(data):
                 page.click("button:has-text('Advanced Search')")
                 page.wait_for_timeout(3000)
             except PlaywrightTimeoutError:
-                print("Error: Advanced Search button not found")
-                raise
+                print("ADVANCED SEARCH BUTTON ON PURCHASE ORDERS PAGE")
+                raise Exception("Failed to click Advanced Search button - structure may have changed")
             page.wait_for_timeout(2000)
 
             # ENTER PO NUMBER IN SEARCH FIELD AND SUBMIT 
@@ -73,8 +85,8 @@ def Request_PO_Amendment(data):
                 page.fill("input#Value_0", data["PO_Number"])
                 page.wait_for_timeout(1000)
             except PlaywrightTimeoutError:
-                print("Error: Search input field not found")
-                raise   
+                print("ENTER PO NUMBER IN SEARCH FIELD")
+                raise Exception("Failed to enter PO number in search field - structure may have changed")
             page.wait_for_timeout(2000)
 
             # CLICK ON SEARCH SUBMIT BUTTON  
@@ -83,8 +95,8 @@ def Request_PO_Amendment(data):
                 page.click("button#customizeSubmitButton")
                 page.wait_for_timeout(8000)
             except PlaywrightTimeoutError:
-                print("Error: Submit button not found")
-                raise   
+                print("CLICK ON SEARCH SUBMIT BUTTON")
+                raise Exception("Failed to click search submit button - structure may have changed") 
             page.wait_for_timeout(2000)    
 
             # CLICK ON PO NUMBER LINK
@@ -103,7 +115,8 @@ def Request_PO_Amendment(data):
                     page.screenshot(path="debug_search_results.png")
                     raise Exception(f"PO Number link for {data['PO_Number']} not found")            
             except PlaywrightTimeoutError  :
-                raise
+                print("CLICK ON PO NUMBER LINK")
+                raise Exception("Failed to click on PO number link - structure may have changed or PO number not found in results")
             page.wait_for_timeout(2000) 
                        
             # INITIATE PO AMENDMENT REQUEST
@@ -121,18 +134,16 @@ def Request_PO_Amendment(data):
                 if not amendment_found:
                     raise Exception("Request PO Amendment button not found")            
             except PlaywrightTimeoutError:
-                raise
+                print("INITIATE PO AMENDMENT REQUEST")
+                raise Exception("Failed to initiate PO amendment request - structure may have changed or user may not have permissions")
             page.wait_for_timeout(10000)    
 
             # MODIFY EXISTING PO LINE ITEMS (QUANTITY CHANGES)
             try:
                 page.wait_for_selector("table[id='POLinesAddRN:Content']", timeout=15000)
             except PlaywrightTimeoutError:
-                tables = page.locator("table").all()
-                if len(tables) > 0:
-                    page.screenshot(path="debug_amendment_form.png")
-
-                #   
+                print("MODIFY EXISTING PO LINE ITEMS")
+                raise Exception("PO lines table not found - structure may have changed or page may not have loaded properly")
             
             # PROCESS CHANGE ITEMS
             try :
@@ -196,7 +207,8 @@ def Request_PO_Amendment(data):
                         except Exception as e:
                             continue
             except PlaywrightTimeoutError :
-                raise
+                print("PROCESS CHANGE ITEMS")
+                raise Exception("Failed to process change items - structure may have changed or items not found in table")
             page.wait_for_timeout(2000)
 
             # ADD NEW LINE ITEMS TO PO
@@ -314,7 +326,8 @@ def Request_PO_Amendment(data):
                     except Exception as e:
                         print(f"Error adding item {added_item.get('Item_Code', 'Unknown')}: {e}")            
             except PlaywrightTimeoutError:
-                raise
+                print("ADD NEW LINE ITEMS TO PO")
+                raise Exception("Failed to add new line items - structure may have changed or inputs not found")
             page.wait_for_timeout(2000)
             
             # ADD ATTACHMENT TO AMENDMENT REQUEST
@@ -329,6 +342,7 @@ def Request_PO_Amendment(data):
                         continue
                 page.wait_for_timeout(2000)
             except PlaywrightTimeoutError:
+                print("ADD ATTACHMENT TO AMENDMENT REQUEST")
                 raise
 
             # SELECT ATTACHMENT CATEGORY 
@@ -378,7 +392,7 @@ def Request_PO_Amendment(data):
                     page.wait_for_timeout(2000)                    
                     page.fill("input#URLInput", data["File_Url"])                    
                 except Exception as e2:
-                    print(f"Could not click URL radio button: {e2}")
+                    print("CONFIGURE URL ATTACHMENT")
             page.wait_for_timeout(2000)
 
             # SAVE ATTACHMENT
@@ -413,7 +427,7 @@ def Request_PO_Amendment(data):
                             page.click("button.x80")
                             page.wait_for_timeout(8000)
                         except Exception as e2:
-                            page.screenshot(path="debug_apply_button.png")            
+                            print("SAVE ATTACHMENT")            
             page.wait_for_timeout(2000)
             
             # SUBMIT PO AMENDMENT REQUEST
@@ -450,12 +464,21 @@ def Request_PO_Amendment(data):
                                 page.click("input[type='submit'][value='Submit']")
                                 page.wait_for_timeout(8000)
                             except Exception as e2:
-                                raise Exception("Could not find Submit button")
+                                print("SUBMIT PO AMENDMENT REQUEST")
+                                raise
             page.wait_for_timeout(5000)
             
             # CLEANUP AND CLOSE BROWSER
             browser.close()
-            print("Browser closed successfully")        
+            print("Browser closed successfully")
+
+            return {
+                "Status": "Success",
+                "Status_Code": 200,
+                "Message": "PO Amendment request submitted successfully.",
+                "PO_Amendment": "1234567890",
+                "Date": time.strftime("%Y-%m-%d %H:%M:%S")
+            }       
             
         except Exception as e:
            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
@@ -486,5 +509,6 @@ if __name__ == "__main__":
     }       
     try:
         result = Request_PO_Amendment(data)
+        print(result)
     except Exception as e:
         print(f"Script failed: {e}") 
