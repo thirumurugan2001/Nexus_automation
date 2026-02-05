@@ -289,7 +289,6 @@ def Request_PO_Amendment(data):
                 try:
                     page.wait_for_selector(selector, timeout=5000)
                     page.click(selector)
-                    print(f"Clicked Add Attachment using selector: {selector}")
                     break
                 except PlaywrightTimeoutError:
                     continue
@@ -303,7 +302,6 @@ def Request_PO_Amendment(data):
                     try:
                         page.wait_for_selector(selector, timeout=5000)
                         page.select_option(selector, label="Miscellaneous")
-                        print("Selected 'Miscellaneous' from category dropdown")
                         category_found = True
                         break
                     except Exception as e:
@@ -351,14 +349,12 @@ def Request_PO_Amendment(data):
                 apply_button = page.locator("button#Okay_uixr")                
                 if apply_button.is_visible():
                     apply_button.click()
-                    print("Clicked Apply button to save attachment")                    
                     page.wait_for_timeout(8000)                    
                     try:
                         success_indicators = ["div:has-text('Attachment added')","div:has-text('successfully')","span:has-text('Attachment')","table:has-text('Signed_File.pdf')", "table:has-text('Miscellaneous')" ]
                         for indicator in success_indicators:
                             try:
                                 page.wait_for_selector(indicator, timeout=3000)
-                                print("Attachment appears to be saved successfully")
                                 break
                             except:
                                 continue
@@ -367,7 +363,6 @@ def Request_PO_Amendment(data):
                 else:
                     print("Apply button is not visible")                    
             except Exception as e:
-                print(f"Error clicking Apply button: {e}")                
                 try:
                     page.click("button[title='Apply']")
                     page.wait_for_timeout(8000)
@@ -389,11 +384,8 @@ def Request_PO_Amendment(data):
                 submit_button = page.locator("button#Submit")                
                 if submit_button.is_visible():
                     page.screenshot(path="before_submit.png")
-                    print("Screenshot taken before submit: before_submit.png")                    
                     submit_button.click()
-                    print("Clicked Submit button for PO amendment")                    
-                    page.wait_for_timeout(8000)
-                    
+                    page.wait_for_timeout(8000)                    
                 else:
                     submit_button.scroll_into_view_if_needed()
                     page.wait_for_timeout(2000)                    
@@ -422,6 +414,7 @@ def Request_PO_Amendment(data):
                                 page.wait_for_timeout(8000)
                             except Exception as e2:
                                 raise Exception("Could not find Submit button")
+            page.wait_for_timeout(5000)
             
             # CLEANUP AND CLOSE BROWSER
             browser.close()
@@ -455,6 +448,5 @@ if __name__ == "__main__":
     }        
     try:
         result = Request_PO_Amendment(data)
-        print("PO Amendment request completed successfully")
     except Exception as e:
         print(f"Script failed: {e}")
