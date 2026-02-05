@@ -4,19 +4,24 @@ import os
 
 def Request_PO_Amendment(data):
     with sync_playwright() as p:
+        # INITIALIZE BROWSER 
         browser = p.chromium.launch(headless=False, slow_mo=100)
         context = browser.new_context() 
         page = context.new_page()
-        page.set_default_timeout(60000)        
+        page.set_default_timeout(60000)                
         email = os.getenv("ERP_EMAIL", "bharathielectricalanna@gmail.com")
-        password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026")
+        password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026")        
         try:
+
+            # LOGIN TO ERP SYSTEM
             page.goto("https://induserp.industowers.com/OA_HTML/AppsLocalLogin.jsp")
             page.wait_for_timeout(5000)            
             page.fill('input[name="usernameField"]', email)
             page.fill('input[name="passwordField"]', password)
             page.press('input[name="passwordField"]', 'Enter')            
-            page.wait_for_timeout(8000)            
+            page.wait_for_timeout(8000) 
+
+            # NAVIGATE TO PURCHASE ORDERS SECTION
             try:
                 page.wait_for_selector("img[title='Expand']", timeout=15000)
                 page.click("img[title='Expand']")
@@ -40,7 +45,9 @@ def Request_PO_Amendment(data):
                 page.wait_for_timeout(5000)
             except PlaywrightTimeoutError:
                 print("Error: Purchase Orders link not found")
-                raise            
+                raise     
+
+            # SEARCH FOR SPECIFIC PO NUMBER 
             try:
                 page.wait_for_selector("button:has-text('Advanced Search')", timeout=15000)
                 page.click("button:has-text('Advanced Search')")
@@ -61,7 +68,9 @@ def Request_PO_Amendment(data):
                 page.wait_for_timeout(8000)
             except PlaywrightTimeoutError:
                 print("Error: Submit button not found")
-                raise            
+                raise       
+
+            # CLICK ON PO NUMBER LINK 
             po_selectors = [f"a:has-text('{data['PO_Number']}')","a[id^='N93:PosPoNumber:']",f"a:contains('{data['PO_Number']}')","table a",]
             po_link_found = False
             for selector in po_selectors:
@@ -75,7 +84,9 @@ def Request_PO_Amendment(data):
             if not po_link_found:
                 page.screenshot(path="debug_search_results.png")
                 raise Exception(f"PO Number link for {data['PO_Number']} not found")            
-            page.wait_for_timeout(3000)            
+            page.wait_for_timeout(3000) 
+                       
+            # INITIATE PO AMENDMENT REQUEST
             amendment_selectors = ["button:text('Request PO Amendment')","button:has-text('Request PO Amendment')","input[value='Request PO Amendment']",]            
             amendment_found = False
             for selector in amendment_selectors:
@@ -88,7 +99,9 @@ def Request_PO_Amendment(data):
                     continue            
             if not amendment_found:
                 raise Exception("Request PO Amendment button not found")            
-            page.wait_for_timeout(10000)                        
+            page.wait_for_timeout(10000)    
+
+            # MODIFY EXISTING PO LINE ITEMS (QUANTITY CHANGES)
             try:
                 page.wait_for_selector("table[id='POLinesAddRN:Content']", timeout=15000)
             except PlaywrightTimeoutError:
@@ -111,6 +124,7 @@ def Request_PO_Amendment(data):
                         if item_cell.count() > 0:
                             item_text = item_cell.inner_text()
                             if item_code in item_text:
+                                # Change action to "Quantity Change"
                                 action_select = row.locator("select")
                                 if action_select.count() > 0:
                                     try:
@@ -121,7 +135,9 @@ def Request_PO_Amendment(data):
                                             action_select.select_option(value="Quantity Change")
                                             page.wait_for_timeout(1000)
                                         except:
-                                            print("Could not change Action dropdown")                                
+                                            print("Could not change Action dropdown")
+                                
+                                # Update quantity
                                 new_qty_cell = row.locator("td[headers='NEWQty']")
                                 if new_qty_cell.count() > 0:
                                     new_qty_cell.click()
@@ -134,6 +150,8 @@ def Request_PO_Amendment(data):
                                     else:
                                         new_qty_cell.type(new_quantity)
                                         page.wait_for_timeout(500)
+                                
+                                # Add reason for change
                                 reason_cell = row.locator("td[headers='ReasonCol']")
                                 if reason_cell.count() > 0:
                                     reason_cell.click()
@@ -149,6 +167,8 @@ def Request_PO_Amendment(data):
                                 break
                     except Exception as e:
                         continue
+            
+            # ADD NEW LINE ITEMS TO PO
             added_items = data.get("Added_Items", [])            
             for added_item in added_items:
                 try:
@@ -165,7 +185,7 @@ def Request_PO_Amendment(data):
                             continue                    
                     if not add_line_clicked:
                         continue                    
-                    page.wait_for_timeout(2000)                  
+                    page.wait_for_timeout(2000)                    
                     try:
                         all_rows = page.locator("table[id='POLinesAddRN:Content'] tr").all()
                         new_row_index = None                        
@@ -183,9 +203,11 @@ def Request_PO_Amendment(data):
                             new_row = all_rows[1] if len(all_rows) > 1 else None
                     except Exception as e:
                         all_rows = page.locator("table[id='POLinesAddRN:Content'] tr").all()
-                        new_row = all_rows[1] if len(all_rows) > 1 else None                    
+                        new_row = all_rows[1] if len(all_rows) > 1 else None                  
+                    
                     if not new_row:
-                        continue
+                        continue                    
+                    # Fill item code
                     item_code_input = new_row.locator("input[id^='POLinesAddRN:ItemType:']")
                     if item_code_input.count() > 0:
                         item_code_input.fill(added_item['Item_Code'])
@@ -196,7 +218,8 @@ def Request_PO_Amendment(data):
                         if item_code_input2.count() > 0:
                             item_code_input2.fill(added_item['Item_Code'])
                             item_code_input2.press("Tab")
-                            page.wait_for_timeout(2000)
+                            page.wait_for_timeout(2000)                    
+                    # Fill quantity
                     qty_input = new_row.locator("input[id^='POLinesAddRN:Qty:']")
                     if qty_input.count() > 0:
                         qty_input.fill(added_item['Quantity'])
@@ -210,6 +233,7 @@ def Request_PO_Amendment(data):
                             qty_input2.press("Tab")
                             print(f"Filled Quantity (alt): {added_item['Quantity']}")
                             page.wait_for_timeout(1000)                    
+                    # Fill project number
                     project_input = new_row.locator("input[id^='POLinesAddRN:ProjectNumberLov:']")
                     if project_input.count() > 0:
                         project_input.fill(added_item['Project_Number'])
@@ -221,6 +245,7 @@ def Request_PO_Amendment(data):
                             project_input2.fill(added_item['Project_Number'])
                             project_input2.press("Tab")
                             page.wait_for_timeout(1000)                    
+                    # Fill reason
                     reason_input = new_row.locator("input[id^='POLinesAddRN:Reason:']")
                     if reason_input.count() > 0:
                         reason_input.fill("As per BOQ")
@@ -232,8 +257,8 @@ def Request_PO_Amendment(data):
                             reason_input2.fill("As per BOQ")
                             reason_input2.press("Tab")
                             print("Filled Reason (alt): As per BOQ")
-                            page.wait_for_timeout(1000)
-                    
+                            page.wait_for_timeout(1000)                    
+                    # Set action to "Add Line"
                     action_select = new_row.locator("select[id^='POLinesAddRN:ManualLine:']")
                     if action_select.count() > 0:
                         try:
@@ -255,8 +280,10 @@ def Request_PO_Amendment(data):
                         print("Warning: Action dropdown not found in new row")                    
                     page.wait_for_timeout(2000)                     
                 except Exception as e:
-                    print(f"Error adding item {added_item.get('Item_Code', 'Unknown')}: {e}")                
-            page.wait_for_timeout(2000)            
+                    print(f"Error adding item {added_item.get('Item_Code', 'Unknown')}: {e}")            
+            page.wait_for_timeout(2000)
+            
+            # ADD ATTACHMENT TO AMENDMENT REQUEST
             attachment_selectors = ["img[title='Add Attachment']","img[alt='Add Attachment']","img[src*='add_attach']","a:has(img[title='Add Attachment'])","a:has(img[alt='Add Attachment'])"]
             for selector in attachment_selectors:
                 try:
@@ -266,7 +293,9 @@ def Request_PO_Amendment(data):
                     break
                 except PlaywrightTimeoutError:
                     continue
-            page.wait_for_timeout(2000)            
+            page.wait_for_timeout(2000)
+
+            # SELECT ATTACHMENT CATEGORY 
             try:
                 category_selectors = ["select#AkAttachmentCategory","select[title='Category Name']","select.x8","select[name='AkAttachmentCategory']"]
                 category_found = False
@@ -287,63 +316,122 @@ def Request_PO_Amendment(data):
                         print("Warning: Could not select category from dropdown")          
             except Exception as e:
                 print(f"Error handling category dropdown: {e}")
-           # Click the URL radio button
+            
+            # CONFIGURE URL ATTACHMENT
             try:
                 page.wait_for_selector("input#AkAttachR2", timeout=5000)
                 page.click("input#AkAttachR2")
-                print("Clicked URL radio button")
-                page.wait_for_timeout(2000)
-                
-                # After clicking URL radio button, fill the URL input
+                page.wait_for_timeout(2000)                
                 try:
-                    # Wait for URL input field to be visible/enabled
                     page.wait_for_selector("input#URLInput", timeout=5000)
                     url_input = page.locator("input#URLInput")
-                    
-                    # Clear the field first (if needed)
                     url_input.click()
-                    url_input.clear()
-                    
-                    # Fill the URL
-                    url_input.fill(data["File_Url"])
-                    print(f"Filled URL: {data['File_Url']}")
-                    
-                    # Press Tab to trigger any onchange events
+                    url_input.clear()                    
+                    url_input.fill(data["File_Url"])                    
                     url_input.press("Tab")
-                    page.wait_for_timeout(1000)
-                    
+                    page.wait_for_timeout(1000)                    
                 except Exception as e:
-                    print(f"Error filling URL input: {e}")
-                    # Try alternative selector
                     try:
                         page.fill("input[name='URLInput']", data["File_Url"])
-                        print(f"Filled URL using name selector: {data['File_Url']}")
                         page.wait_for_timeout(1000)
                     except Exception as e2:
-                        print(f"Could not fill URL input: {e2}")
-                        page.screenshot(path="debug_url_input.png")
-                        
+                        print(f"Could not fill URL input: {e2}")                        
             except Exception as e:
-                print(f"Error clicking URL radio button: {e}")
-                # Try alternative selectors
                 try:
                     page.click("input[value='URL'][name='AkAttachRB']")
-                    print("Clicked URL radio button using alternative selector")
-                    page.wait_for_timeout(2000)
-                    
-                    # Fill URL after clicking radio button
-                    page.fill("input#URLInput", data["File_Url"])
-                    print(f"Filled URL after alt radio click: {data['File_Url']}")
-                    
+                    page.wait_for_timeout(2000)                    
+                    page.fill("input#URLInput", data["File_Url"])                    
                 except Exception as e2:
                     print(f"Could not click URL radio button: {e2}")
+            page.wait_for_timeout(2000)
 
+            # SAVE ATTACHMENT
+            try:
+                page.wait_for_selector("button#Okay_uixr", timeout=5000)                
+                apply_button = page.locator("button#Okay_uixr")                
+                if apply_button.is_visible():
+                    apply_button.click()
+                    print("Clicked Apply button to save attachment")                    
+                    page.wait_for_timeout(8000)                    
+                    try:
+                        success_indicators = ["div:has-text('Attachment added')","div:has-text('successfully')","span:has-text('Attachment')","table:has-text('Signed_File.pdf')", "table:has-text('Miscellaneous')" ]
+                        for indicator in success_indicators:
+                            try:
+                                page.wait_for_selector(indicator, timeout=3000)
+                                print("Attachment appears to be saved successfully")
+                                break
+                            except:
+                                continue
+                    except Exception as e:
+                        print(f"Could not verify attachment save: {e}")
+                else:
+                    print("Apply button is not visible")                    
+            except Exception as e:
+                print(f"Error clicking Apply button: {e}")                
+                try:
+                    page.click("button[title='Apply']")
+                    page.wait_for_timeout(8000)
+                except:
+                    try:
+                        page.click("button:has-text('Apply')")
+                        page.wait_for_timeout(8000)
+                    except:
+                        try:
+                            page.click("button.x80")
+                            page.wait_for_timeout(8000)
+                        except Exception as e2:
+                            page.screenshot(path="debug_apply_button.png")            
+            page.wait_for_timeout(2000)
+            
+            # SUBMIT PO AMENDMENT REQUEST
+            try:
+                page.wait_for_selector("button#Submit", timeout=10000)                
+                submit_button = page.locator("button#Submit")                
+                if submit_button.is_visible():
+                    page.screenshot(path="before_submit.png")
+                    print("Screenshot taken before submit: before_submit.png")                    
+                    submit_button.click()
+                    print("Clicked Submit button for PO amendment")                    
+                    page.wait_for_timeout(8000)
+                    
+                else:
+                    submit_button.scroll_into_view_if_needed()
+                    page.wait_for_timeout(2000)                    
+                    if submit_button.is_visible():
+                        submit_button.click()
+                        page.wait_for_timeout(8000)
+                    else:
+                        raise Exception("Submit button not visible even after scrolling")                    
+            except Exception as e:
+                print(f"Error clicking Submit button by ID: {e}")                
+                try:
+                    page.click("button:has-text('Submit')")
+                    page.wait_for_timeout(8000)
+                except:
+                    try:
+                        page.click("button[title='Submit']")
+                        print("Clicked Submit button using title selector")
+                        page.wait_for_timeout(8000)
+                    except:
+                        try:
+                            page.click("button.x80:has-text('Submit')")
+                            page.wait_for_timeout(8000)
+                        except:
+                            try:
+                                page.click("input[type='submit'][value='Submit']")
+                                page.wait_for_timeout(8000)
+                            except Exception as e2:
+                                raise Exception("Could not find Submit button")
+            
+            # CLEANUP AND CLOSE BROWSER
             browser.close()
             print("Browser closed successfully")            
+            
         except Exception as e:
            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
+    #  TEST DATA CONFIGURATION 
     data = {
         "PO_Number": "23030562008",
         "File_Url": "https://3f9a4e5dd7b6b0998a280c44401343a5.cdn.bubble.io/f1742198933168x784106798636753400/Signed_File.pdf",
@@ -364,7 +452,7 @@ if __name__ == "__main__":
                 "Quantity": "5",
                 "Project_Number": "R/RL-8139267"
             }]
-    }    
+    }        
     try:
         result = Request_PO_Amendment(data)
         print("PO Amendment request completed successfully")
