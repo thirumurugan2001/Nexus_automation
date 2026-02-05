@@ -455,12 +455,13 @@ def Request_PO_Amendment(data):
             
             # CLEANUP AND CLOSE BROWSER
             browser.close()
-            print("Browser closed successfully")            
+            print("Browser closed successfully")        
             
         except Exception as e:
            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
+
     #  TEST DATA CONFIGURATION 
     data = {
         "PO_Number": "23030562008",
@@ -482,7 +483,7 @@ if __name__ == "__main__":
                 "Quantity": "5",
                 "Project_Number": "R/RL-8139267"
             }]
-    }        
+    }       
     try:
         result = Request_PO_Amendment(data)
     except Exception as e:
