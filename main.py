@@ -470,16 +470,13 @@ def Request_PO_Amendment(data):
             
             # CLEANUP AND CLOSE BROWSER
             browser.close()
-            print("Browser closed successfully")
-
             return {
                 "Status": "Success",
                 "Status_Code": 200,
                 "Message": "PO Amendment request submitted successfully.",
                 "PO_Amendment": "1234567890",
                 "Date": time.strftime("%Y-%m-%d %H:%M:%S")
-            }       
-            
+            }    
         except Exception as e:
            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
