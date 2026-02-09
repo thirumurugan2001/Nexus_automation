@@ -466,8 +466,7 @@ def Request_PO_Amendment(data):
                             except Exception as e2:
                                 print("SUBMIT PO AMENDMENT REQUEST")
                                 raise
-            page.wait_for_timeout(5000)
-            
+            page.wait_for_timeout(5000)            
 
             # HANDLE CONFIRMATION POPUP
             try:
@@ -513,7 +512,7 @@ def Request_PO_Amendment(data):
            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
-
+    
     #  TEST DATA CONFIGURATION 
     data = {
         "PO_Number": "23030562008",
@@ -540,4 +539,4 @@ if __name__ == "__main__":
         result = Request_PO_Amendment(data)
         print(result)
     except Exception as e:
-        print(f"Script failed: {e}") 
+        print(f"Script failed: {e}")
