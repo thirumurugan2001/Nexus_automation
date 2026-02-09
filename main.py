@@ -1,4 +1,5 @@
 import time
+import re
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 import os
 
@@ -6,28 +7,28 @@ def Request_PO_Amendment(data):
     with sync_playwright() as p:       
         try:            
             # INITIALIZE BROWSER
-            try :
+            try:
                 browser = p.chromium.launch(headless=False, slow_mo=100)
                 context = browser.new_context() 
                 page = context.new_page()
                 page.set_default_timeout(60000)                
                 email = os.getenv("ERP_EMAIL", "bharathielectricalanna@gmail.com")
-                password = os.getenv("ERP_PASSWORD", "Nexus.Jan@2026") 
-            except PlaywrightTimeoutError as e:
+                password = os.getenv("ERP_PASSWORD", "Nexus.May@2026") 
+            except Exception as e:
                 print("INITIALIZE BROWSER")
                 raise Exception(f"Failed to initialize browser: {str(e)}")
 
             # LOGIN TO ERP SYSTEM
-            try : 
+            try: 
                 page.goto("https://induserp.industowers.com/OA_HTML/AppsLocalLogin.jsp")
                 page.wait_for_timeout(5000)            
                 page.fill('input[name="usernameField"]', email)
                 page.fill('input[name="passwordField"]', password)
                 page.press('input[name="passwordField"]', 'Enter')            
                 page.wait_for_timeout(8000)
-            except PlaywrightTimeoutError:
+            except Exception as e:
                 print("LOGIN TO ERP SYSTEM")
-                raise Exception("Failed to login - check credentials or page structure")
+                raise Exception(f"Failed to login - check credentials or page structure: {str(e)}")
             page.wait_for_timeout(2000)
 
             # EXPAND NAVIGATION MENU AND GO TO HOME PAGE
@@ -49,7 +50,7 @@ def Request_PO_Amendment(data):
                 raise Exception("Failed to click Home Page link - structure may have changed")
             page.wait_for_timeout(2000)
 
-            # CLCICK ON ORDERS LINK IN NAVIGATION MENU
+            # CLICK ON ORDERS LINK IN NAVIGATION MENU
             try:
                 page.wait_for_selector("a:has-text('Orders')", timeout=15000)
                 page.click("a:has-text('Orders')")
@@ -100,7 +101,7 @@ def Request_PO_Amendment(data):
             page.wait_for_timeout(2000)    
 
             # CLICK ON PO NUMBER LINK
-            try : 
+            try: 
                 po_selectors = [f"a:has-text('{data['PO_Number']}')","a[id^='N93:PosPoNumber:']",f"a:contains('{data['PO_Number']}')","table a",]
                 po_link_found = False
                 for selector in po_selectors:
@@ -114,13 +115,13 @@ def Request_PO_Amendment(data):
                 if not po_link_found:
                     page.screenshot(path="debug_search_results.png")
                     raise Exception(f"PO Number link for {data['PO_Number']} not found")            
-            except PlaywrightTimeoutError  :
+            except PlaywrightTimeoutError:
                 print("CLICK ON PO NUMBER LINK")
                 raise Exception("Failed to click on PO number link - structure may have changed or PO number not found in results")
             page.wait_for_timeout(2000) 
                        
             # INITIATE PO AMENDMENT REQUEST
-            try :
+            try:
                 amendment_selectors = ["button:text('Request PO Amendment')","button:has-text('Request PO Amendment')","input[value='Request PO Amendment']",]            
                 amendment_found = False
                 for selector in amendment_selectors:
@@ -146,7 +147,7 @@ def Request_PO_Amendment(data):
                 raise Exception("PO lines table not found - structure may have changed or page may not have loaded properly")
             
             # PROCESS CHANGE ITEMS
-            try :
+            try:
                 change_items = data.get("Change_Item", [])
                 for change_item in change_items:
                     item_code = change_item["Item_Code"]
@@ -206,9 +207,9 @@ def Request_PO_Amendment(data):
                                     break
                         except Exception as e:
                             continue
-            except PlaywrightTimeoutError :
+            except Exception as e:
                 print("PROCESS CHANGE ITEMS")
-                raise Exception("Failed to process change items - structure may have changed or items not found in table")
+                raise Exception(f"Failed to process change items - structure may have changed or items not found in table: {str(e)}")
             page.wait_for_timeout(2000)
 
             # ADD NEW LINE ITEMS TO PO
@@ -325,9 +326,9 @@ def Request_PO_Amendment(data):
                         page.wait_for_timeout(2000)                     
                     except Exception as e:
                         print(f"Error adding item {added_item.get('Item_Code', 'Unknown')}: {e}")            
-            except PlaywrightTimeoutError:
+            except Exception as e:
                 print("ADD NEW LINE ITEMS TO PO")
-                raise Exception("Failed to add new line items - structure may have changed or inputs not found")
+                raise Exception(f"Failed to add new line items - structure may have changed or inputs not found: {str(e)}")
             page.wait_for_timeout(2000)
             
             # ADD ATTACHMENT TO AMENDMENT REQUEST
@@ -341,9 +342,9 @@ def Request_PO_Amendment(data):
                     except PlaywrightTimeoutError:
                         continue
                 page.wait_for_timeout(2000)
-            except PlaywrightTimeoutError:
+            except Exception as e:
                 print("ADD ATTACHMENT TO AMENDMENT REQUEST")
-                raise
+                raise Exception(f"Failed to add attachment: {str(e)}")
 
             # SELECT ATTACHMENT CATEGORY 
             try:
@@ -453,7 +454,6 @@ def Request_PO_Amendment(data):
                 except:
                     try:
                         page.click("button[title='Submit']")
-                        print("Clicked Submit button using title selector")
                         page.wait_for_timeout(8000)
                     except:
                         try:
@@ -468,13 +468,42 @@ def Request_PO_Amendment(data):
                                 raise
             page.wait_for_timeout(5000)            
 
-            # HANDLE CONFIRMATION POPUP
+            # HANDLE CONFIRMATION POPUP AND EXTRACT REQUEST ID
+            request_id = None
+            success_message = None
             try:
-                page.wait_for_selector("iframe#iframedefaultDialogPopup", timeout=10000)
-                iframe = page.frame_locator("iframe#iframedefaultDialogPopup")
+                page.wait_for_selector("iframe#iframedefaultDialogPopup", timeout=15000)                
+                iframe = page.frame_locator("iframe#iframedefaultDialogPopup")                
                 iframe.locator("button[title='Yes']").wait_for(timeout=5000)                
-                iframe.locator("button[title='Yes']").click()
+                try:
+                    success_message = iframe.locator("body").inner_text(timeout=3000)
+                    request_id_pattern = r"Request ID:\s*([^\s]+)"
+                    match = re.search(request_id_pattern, success_message)                    
+                    if match:
+                        request_id = match.group(1)
+                        print(f"Extracted Request ID: {request_id}")
+                    else:
+                        patterns = [r"ID:\s*([^\s]+)",r"Request\s*ID\s*:\s*([^\s]+)",r"Request\s*#\s*:\s*([^\s]+)",r"([0-9]{8}-[0-9]{6,})", r"Changes has been submitted.*?([0-9-]+)"]
+                        for pattern in patterns:
+                            match = re.search(pattern, success_message)
+                            if match:
+                                request_id = match.group(1)
+                                print(f"Extracted Request ID using pattern: {request_id}")
+                                break
+                except Exception as e:
+                    print(f"Could not extract success message before clicking Yes: {e}")
+                iframe.locator("button[title='Yes']").click()                
                 page.wait_for_timeout(5000)                
+                if not request_id:
+                    try:
+                        success_message = iframe.locator("body").inner_text(timeout=2000)
+                        if success_message:
+                            match = re.search(r"Request ID:\s*([^\s]+)", success_message)
+                            if match:
+                                request_id = match.group(1)
+                                print(f"Extracted Request ID after click: {request_id}")
+                    except:
+                        pass                
                 page.bring_to_front()                
             except Exception as e:
                 print(f"Error handling confirmation popup: {e}")                
@@ -490,30 +519,114 @@ def Request_PO_Amendment(data):
                             page.wait_for_timeout(5000)
                             break
                         except:
-                            continue
+                            continue                    
                     if not yes_clicked:
-                        print("Warning: Could not click Yes button in confirmation popup")
+                        print("Warning: Could not click Yes button in confirmation popup")                        
                 except Exception as e2:
                     print(f"Alternative Yes button click also failed: {e2}")
+            page.wait_for_timeout(10000)
             
-            # WAIT FOR FINAL PROCESSING
-            page.wait_for_timeout(15000)
+            # If we still don't have the Request ID, try to find it on the main page
+            if not request_id:
+                try:
+                    # Look for success message on main page
+                    success_selectors = [
+                        "div:has-text('Changes has been submitted')",
+                        "div:has-text('Request ID')",
+                        "div:has-text('successfully')",
+                        "div.popupContent",
+                        "div.OraParamPopupContent"
+                    ]
+                    
+                    for selector in success_selectors:
+                        try:
+                            page.wait_for_selector(selector, timeout=3000)
+                            success_message = page.locator(selector).inner_text()
+                            if success_message:
+                                print(f"Found success message on main page: {success_message}")
+                                
+                                # Extract Request ID
+                                match = re.search(r"Request ID:\s*([^\s]+)", success_message)
+                                if match:
+                                    request_id = match.group(1)
+                                    print(f"Extracted Request ID from main page: {request_id}")
+                                    break
+                        except:
+                            continue
+                            
+                    # If still not found, try regex patterns on page content
+                    if not request_id:
+                        try:
+                            page_content = page.content()
+                            patterns = [
+                                r"Request ID:\s*([^\s<>&]+)",
+                                r"Changes has been submitted.*?([0-9]{8}-[0-9]{6,})",
+                                r"([0-9]{8}-[0-9]{6,})"
+                            ]
+                            for pattern in patterns:
+                                match = re.search(pattern, page_content)
+                                if match:
+                                    request_id = match.group(1)
+                                    print(f"Extracted Request ID from page content: {request_id}")
+                                    break
+                        except Exception as e:
+                            print(f"Could not extract Request ID from page content: {e}")
+                except Exception as e:
+                    print(f"Could not find Request ID on main page: {e}")
+            
+            # Take final screenshot for record
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            screenshot_path = f"po_amendment_final_{timestamp}.png"
+            page.screenshot(path=screenshot_path, full_page=True)
+            print(f"Final screenshot saved: {screenshot_path}")
                      
             # CLEANUP AND CLOSE BROWSER
             browser.close()
-            return {
-                "Status": "Success",
-                "Status_Code": 200,
-                "Message": "PO Amendment request submitted successfully.",
-                "PO_Amendment": "1234567890",
-                "Date": time.strftime("%Y-%m-%d %H:%M:%S")
-            }    
+            
+            # Prepare response
+            if request_id:
+                return {
+                    "Status": "Success",
+                    "Status_Code": 200,
+                    "Message": success_message if success_message else "PO Amendment request submitted successfully.",
+                    "PO_Amendment": request_id,
+                    "PO_Number": data["PO_Number"],
+                    "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "Screenshot": screenshot_path
+                }
+            else:
+                # If we couldn't extract the Request ID, still return success but with a note
+                return {
+                    "Status": "Success (Request ID not captured)",
+                    "Status_Code": 200,
+                    "Message": "PO Amendment request was submitted, but could not capture the Request ID. Please check manually.",
+                    "PO_Amendment": "Not captured",
+                    "PO_Number": data["PO_Number"],
+                    "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "Screenshot": screenshot_path
+                }
+                
         except Exception as e:
-           raise Exception(f"Failed to process PO Amendment request: {str(e)}")
+            # Take error screenshot
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            error_screenshot_path = f"po_amendment_error_{timestamp}.png"
+            try:
+                page.screenshot(path=error_screenshot_path, full_page=True)
+                print(f"Error screenshot saved: {error_screenshot_path}")
+            except:
+                pass
+            
+            # Close browser if it exists
+            try:
+                browser.close()
+            except:
+                pass
+                
+            raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
     
-    #  TEST DATA CONFIGURATION 
+    # TEST DATA CONFIGURATION 
     data = {
         "PO_Number": "23030562008",
         "File_Url": "https://3f9a4e5dd7b6b0998a280c44401343a5.cdn.bubble.io/f1742198933168x784106798636753400/Signed_File.pdf",
@@ -537,6 +650,14 @@ if __name__ == "__main__":
     }       
     try:
         result = Request_PO_Amendment(data)
-        print(result)
+        print("\n" + "="*60)
+        print("PO AMENDMENT REQUEST COMPLETED")
+        print("="*60)
+        print(f"Status: {result['Status']}")
+        print(f"PO Number: {result['PO_Number']}")
+        print(f"Request ID: {result['PO_Amendment']}")
+        print(f"Date: {result['Date']}")
+        print(f"Message: {result['Message']}")
+        print("="*60)
     except Exception as e:
         print(f"Script failed: {e}")
