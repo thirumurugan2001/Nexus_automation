@@ -468,6 +468,38 @@ def Request_PO_Amendment(data):
                                 raise
             page.wait_for_timeout(5000)
             
+
+            # HANDLE CONFIRMATION POPUP
+            try:
+                page.wait_for_selector("iframe#iframedefaultDialogPopup", timeout=10000)
+                iframe = page.frame_locator("iframe#iframedefaultDialogPopup")
+                iframe.locator("button[title='Yes']").wait_for(timeout=5000)                
+                iframe.locator("button[title='Yes']").click()
+                page.wait_for_timeout(5000)                
+                page.bring_to_front()                
+            except Exception as e:
+                print(f"Error handling confirmation popup: {e}")                
+                try:
+                    yes_button_selectors = ["button[title='Yes']","button:has-text('Yes')","button.x80:has-text('Yes')","button:has-text('Y')es"]
+                    yes_clicked = False
+                    for selector in yes_button_selectors:
+                        try:
+                            page.wait_for_selector(selector, timeout=3000)
+                            page.click(selector)
+                            print(f"Clicked Yes button using selector: {selector}")
+                            yes_clicked = True
+                            page.wait_for_timeout(5000)
+                            break
+                        except:
+                            continue
+                    if not yes_clicked:
+                        print("Warning: Could not click Yes button in confirmation popup")
+                except Exception as e2:
+                    print(f"Alternative Yes button click also failed: {e2}")
+            
+            # WAIT FOR FINAL PROCESSING
+            page.wait_for_timeout(15000)
+                     
             # CLEANUP AND CLOSE BROWSER
             browser.close()
             return {
