@@ -469,9 +469,9 @@ def Request_PO_Amendment(data):
             page.wait_for_timeout(5000)            
 
             # HANDLE CONFIRMATION POPUP AND EXTRACT REQUEST ID
-            request_id = None
-            success_message = None
             try:
+                request_id = None
+                success_message = None
                 page.wait_for_selector("iframe#iframedefaultDialogPopup", timeout=15000)                
                 iframe = page.frame_locator("iframe#iframedefaultDialogPopup")                
                 iframe.locator("button[title='Yes']").wait_for(timeout=5000)                
@@ -573,12 +573,6 @@ def Request_PO_Amendment(data):
                             print(f"Could not extract Request ID from page content: {e}")
                 except Exception as e:
                     print(f"Could not find Request ID on main page: {e}")
-            
-            # Take final screenshot for record
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            screenshot_path = f"po_amendment_final_{timestamp}.png"
-            page.screenshot(path=screenshot_path, full_page=True)
-            print(f"Final screenshot saved: {screenshot_path}")
                      
             # CLEANUP AND CLOSE BROWSER
             browser.close()
@@ -592,7 +586,6 @@ def Request_PO_Amendment(data):
                     "PO_Amendment": request_id,
                     "PO_Number": data["PO_Number"],
                     "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "Screenshot": screenshot_path
                 }
             else:
                 # If we couldn't extract the Request ID, still return success but with a note
@@ -603,11 +596,9 @@ def Request_PO_Amendment(data):
                     "PO_Amendment": "Not captured",
                     "PO_Number": data["PO_Number"],
                     "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "Screenshot": screenshot_path
                 }
                 
         except Exception as e:
-            # Take error screenshot
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             error_screenshot_path = f"po_amendment_error_{timestamp}.png"
             try:
@@ -616,30 +607,28 @@ def Request_PO_Amendment(data):
             except:
                 pass
             
-            # Close browser if it exists
             try:
                 browser.close()
             except:
-                pass
-                
+                pass                
             raise Exception(f"Failed to process PO Amendment request: {str(e)}")
 
 if __name__ == "__main__":
     
     # TEST DATA CONFIGURATION 
     data = {
-        "PO_Number": "23030562008",
+        "PO_Number": "23030558874",
         "File_Url": "https://3f9a4e5dd7b6b0998a280c44401343a5.cdn.bubble.io/f1742198933168x784106798636753400/Signed_File.pdf",
         "Change_Item": [
             {
                 "PO_Line_No": "1",
-                "Item_Code": "22-208830-0-03-ZZ-ZZ-000",
-                "New_Quantity": "10"
+                "Item_Code": "22-212660-0-03-ZZ-ZZ-000",
+                "New_Quantity": "7"
             },
             {
                 "PO_Line_No": "2",
-                "Item_Code": "29-300000-C-00-ZZ-ZZ-L46",
-                "New_Quantity": "10"
+                "Item_Code": "22-212760-0-03-ZZ-ZZ-000",
+                "New_Quantity": "7"
             },
         ],
         "Added_Items": [{
@@ -650,14 +639,6 @@ if __name__ == "__main__":
     }       
     try:
         result = Request_PO_Amendment(data)
-        print("\n" + "="*60)
-        print("PO AMENDMENT REQUEST COMPLETED")
-        print("="*60)
-        print(f"Status: {result['Status']}")
-        print(f"PO Number: {result['PO_Number']}")
-        print(f"Request ID: {result['PO_Amendment']}")
-        print(f"Date: {result['Date']}")
-        print(f"Message: {result['Message']}")
-        print("="*60)
+        print("Result:", result)
     except Exception as e:
         print(f"Script failed: {e}")
