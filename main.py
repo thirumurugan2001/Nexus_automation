@@ -8,7 +8,7 @@ def Request_PO_Amendment(data):
         try:            
             # INITIALIZE BROWSER
             try:
-                browser = p.chromium.launch(headless=False, slow_mo=100)
+                browser = p.chromium.launch(headless=True, slow_mo=100)
                 context = browser.new_context() 
                 page = context.new_page()
                 page.set_default_timeout(60000)                
@@ -631,11 +631,7 @@ if __name__ == "__main__":
                 "New_Quantity": "7"
             },
         ],
-        "Added_Items": [{
-                "Item_Code": "29-400000-0-00-ZZ-ZZ-886",
-                "Quantity": "5",
-                "Project_Number": "R/RL-8139267"
-            }]
+        "Added_Items": []
     }       
     try:
         result = Request_PO_Amendment(data)
